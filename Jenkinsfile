@@ -4,7 +4,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/s223930381/8.2CDevSecOps.git'
+                checkout scm
             }
         }
 
@@ -16,25 +16,31 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                sh 'npm test || true'
+                sh 'npm test'
             }
         }
 
-        stage('Security Scan (npm audit)') {
+        stage('Generate Coverage Report') {
             steps {
-                sh 'npm audit || true'
+                sh 'npm run coverage'
             }
         }
-    }
 
-    post {
-        always {
-            emailext(
-                subject: "Jenkins Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
-                body: """Build finished with status: ${currentBuild.currentResult}
-                Check console output at: ${env.BUILD_URL}""",
-                to: 's223930381@deakin.edu.au'
-            )
+        stage('NPM Audit') {
+            steps {
+                sh 'npm audit --audit-level=high || true'
+            }
+        }
+
+        stage('SonarCloud Analysis') {
+            steps {
+                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                    sh '''
+                        sonar-scanner \
+                          -Dsonar.login=$SONAR_TOKEN
+                    '''
+                }
+            }
         }
     }
 }
